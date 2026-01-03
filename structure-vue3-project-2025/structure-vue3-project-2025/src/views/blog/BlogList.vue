@@ -6,7 +6,7 @@
         <Button>Create New Blog</Button>
       </router-link>
     </div>
-    
+
     <!-- Search and Filter -->
     <div class="bg-white rounded-lg shadow-md p-4 mb-6">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -35,19 +35,19 @@
         <Button @click="loadBlogs" :loading="loading">Refresh</Button>
       </div>
     </div>
-    
+
     <!-- Blog List -->
     <div v-if="loading && blogs.length === 0" class="text-center py-12">
       <div class="text-gray-500">Loading blogs...</div>
     </div>
-    
+
     <div v-else-if="blogs.length === 0" class="text-center py-12">
       <div class="text-gray-500 mb-4">No blogs found</div>
       <router-link to="/blogs/create">
         <Button>Create Your First Blog</Button>
       </router-link>
     </div>
-    
+
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div
         v-for="blog in blogs"
@@ -56,11 +56,10 @@
         @click="$router.push(`/blogs/${blog.id}`)"
       >
         <img
-          v-if="blog.image"
-          :src="blog.image"
-          :alt="blog.title"
-          class="w-full h-48 object-cover"
-        />
+  :src="`http://localhost:8000/uploads/${blog.image}`"
+  alt="Blog Image"
+  @error="$event.target.src = '/default.jpg'; $event.target.onerror = null;"
+/>
         <div class="p-6">
           <h3 class="text-xl font-bold text-gray-900 mb-2 line-clamp-2">{{ blog.title }}</h3>
           <p class="text-gray-600 mb-4 line-clamp-3">{{ blog.content }}</p>
@@ -84,7 +83,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Pagination -->
     <div v-if="meta.total > meta.limit" class="mt-6 flex justify-center">
       <div class="flex space-x-2">
@@ -142,7 +141,7 @@ const loadBlogs = async () => {
       sort: sortBy.value,
       order: sortOrder.value
     })
-    
+
     if (response.success) {
       blogs.value = response.data.blogs || response.data || []
       meta.value = {
