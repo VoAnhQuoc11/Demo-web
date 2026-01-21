@@ -9,29 +9,38 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.client.api.AuthService
+import com.example.client.api.RetrofitClient // [Mới] Import RetrofitClient
 import com.example.client.model.data.Message
 import com.example.client.model.repository.SocketRepository
+import com.example.client.utils.FileUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull // [Mới] Import extension này
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.UUID
+import kotlin.jvm.java
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = SocketRepository()
 
+    // [Sửa] Khởi tạo authService để dùng API upload
+    // Hãy đảm bảo RetrofitClient của bạn có biến 'instance' hoặc hàm 'create()' trả về AuthService
+    private val authService = RetrofitClient.instance.create(AuthService::class.java)
+
     val messages: StateFlow<List<Message>> = repository.messages
 
-
     val currentUserId: String
-
-    // Phòng chat cố định (để test)
-    val currentRoomId = "room_abc"
+    val currentRoomId = "room_abc" // Phòng chat cố định (để test)
 
     private val _typingUser = MutableStateFlow<String?>(null)
     val typingUser: StateFlow<String?> = _typingUser
@@ -47,16 +56,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         var savedId = prefs.getString("user_id", null)
 
         if (savedId == null) {
-            // Nếu chưa có (lần đầu mở app), tạo ID mới và lưu lại
             savedId = "user_${UUID.randomUUID().toString().substring(0, 5)}"
             prefs.edit().putString("user_id", savedId).apply()
         }
-        currentUserId = savedId
+        currentUserId = savedId!! // !! vì đã check null ở trên
 
-        // 2. Kết nối Socket
+        // Kết nối Socket
         repository.connect()
 
-        // 3. Lắng nghe lịch sử
+        // Lắng nghe lịch sử
         repository.socket.on("load_history") { args ->
             if (args.isNotEmpty()) {
                 val jsonArray = args[0] as JSONArray
@@ -68,7 +76,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     historyList.add(message)
                 }
 
-                // Cập nhật list tin nhắn (chạy trên UI Scope để an toàn)
                 viewModelScope.launch {
                     repository.updateMessageList(historyList)
                 }
@@ -77,7 +84,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         joinRoom(currentRoomId)
 
-        // Các sự kiện lắng nghe khác giữ nguyên
         repository.socket.on("user_typing") { args ->
             val userId = args[0] as String
             if (userId != currentUserId) {
@@ -112,42 +118,40 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
         repository.disconnect()
     }
+
     fun onUserInputChanged(text: String) {
         if (text.isNotBlank()) {
-            // Gửi sự kiện đang gõ
+            // [Sửa] Truy cập socket qua repository
             repository.socket.emit("typing", currentRoomId)
 
-            // Hủy lệnh dừng cũ và đặt lệnh dừng mới sau 2 giây
             typingHandler.removeCallbacks(stopTypingRunnable)
             typingHandler.postDelayed(stopTypingRunnable, 2000)
         }
     }
 
-    // Hàm báo đã xem tin nhắn (gọi khi MessageBubble hiển thị)
     fun markAsSeen(message: Message) {
         if (message.senderId != currentUserId && message.status != "seen") {
             val data = JSONObject()
             data.put("roomId", currentRoomId)
             data.put("messageId", message.id)
+            // [Sửa] Truy cập socket qua repository
             repository.socket.emit("mark_seen", data)
         }
     }
+
     fun sendImage(context: Context, uri: Uri) {
         val base64Image = uriToBase64(context, uri)
         if (base64Image != null) {
-            // Gửi với type là IMAGE. Chuỗi base64 cần có prefix để hiển thị được
             val content = "data:image/jpeg;base64,$base64Image"
             repository.sendMessage(content, currentRoomId, currentUserId, "IMAGE")
         }
     }
 
-    // Hàm phụ trợ chuyển Uri sang Base64
     private fun uriToBase64(context: Context, uri: Uri): String? {
         return try {
             val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
             val bitmap = BitmapFactory.decodeStream(inputStream)
             val outputStream = ByteArrayOutputStream()
-            // Nén ảnh xuống định dạng JPEG, chất lượng 50% để giảm dung lượng
             bitmap.compress(Bitmap.CompressFormat.JPEG, 50, outputStream)
             val byteArray = outputStream.toByteArray()
             Base64.encodeToString(byteArray, Base64.NO_WRAP)
@@ -157,4 +161,37 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // --- CHỨC NĂNG GỬI FILE MỚI ---
+    fun uploadAndSendFile(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            try {
+                // 1. Chuyển Uri thành File
+                val file = FileUtils.getFileFromUri(context, uri)
+
+                if (file != null) {
+                    // 2. Tạo Request Body
+                    val requestFile = file.asRequestBody("application/octet-stream".toMediaTypeOrNull())
+                    val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
+
+                    // 3. Upload lên Server (Sử dụng biến authService đã khai báo ở trên)
+                    val response = authService.uploadFile(body)
+
+                    // 4. Gửi Socket
+                    val messageData = JSONObject().apply {
+                        put("room", currentRoomId)
+                        put("sender", currentUserId)
+                        put("content", response.url) // Link file từ server trả về
+                        put("type", "file")          // Đánh dấu là file
+                        put("fileName", file.name)   // Tên file gốc
+                    }
+
+                    // [Sửa] Truy cập socket qua repository
+                    repository.socket.emit("send_message", messageData)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Bạn có thể thêm StateFlow để hiển thị lỗi lên UI nếu muốn
+            }
+        }
+    }
 }

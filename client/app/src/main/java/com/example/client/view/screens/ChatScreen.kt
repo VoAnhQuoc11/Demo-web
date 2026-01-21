@@ -2,6 +2,7 @@ package com.example.client.view.screens
 
 
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult // [MỚI] Để tạo launcher chọn ảnh
 import androidx.activity.result.PickVisualMediaRequest // [MỚI] Yêu cầu chọn media
 import androidx.activity.result.contract.ActivityResultContracts // [MỚI] Hợp đồng chọn ảnh
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons // [MỚI]
 import androidx.compose.material.icons.filled.Add // [MỚI] Icon dấu +
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,12 +37,24 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     var textState by remember { mutableStateOf("") }
     val typingUser by viewModel.typingUser.collectAsState()
     val listState = rememberLazyListState()
-    val context = LocalContext.current // Lấy context để xử lý ảnh
+    LocalContext.current // Lấy context để xử lý ảnh
+    val chatViewModel: ChatViewModel = viewModel()
+
+    // Khai báo Context để dùng cho hàm upload
+    val context = LocalContext.current
 
     // Bộ chọn ảnh (Photo Picker)
     val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             viewModel.sendImage(context, uri)
+        }
+    }
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            // Gọi ViewModel để xử lý gửi file
+            chatViewModel.uploadAndSendFile(context, it)
         }
     }
 
@@ -118,6 +132,20 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                         imageVector = Icons.Default.Add, // Hoặc thay bằng icon Image/Attach
                         contentDescription = "Gửi ảnh",
                         tint = YellowPrimary
+                    )
+                }
+                IconButton(onClick = {
+                    // Chỉ định các loại file muốn chọn
+                    val mimeTypes = arrayOf(
+                        "application/pdf", // PDF
+                        "application/msword", // Word (.doc)
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" // Word (.docx)
+                    )
+                    filePickerLauncher.launch(mimeTypes)
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Description, // Icon hình tờ giấy
+                        contentDescription = "Send File"
                     )
                 }
 

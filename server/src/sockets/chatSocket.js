@@ -22,26 +22,44 @@ module.exports = (io, socket) => {
     });
 
     // --- 2. GỬI TIN NHẮN TEXT ---
-    socket.on('send_message', async (data) => {
-        console.log('📩 Text received:', data.content);
-        try {
-            const newMessage = new Message({
-                roomId: data.roomId,
-                senderId: data.senderId, // Lấy từ client gửi lên (giống test server)
-                content: data.content,
-                type: 'TEXT',
-                status: 'sent',
-                timestamp: Date.now()
-            });
+socket.on('send_message', async (data) => {
+    try {
+        console.log("📩 Nhận tin nhắn:", data); 
 
-            const savedMsg = await newMessage.save();
-            
-            // Emit lại cho cả phòng
-            io.in(data.roomId).emit('receive_message', savedMsg.formatForClient());
-        } catch (error) {
-            console.error("[Error] Send text failed:", error);
-        }
-    });
+        // 1. Tạo object tin nhắn mới
+        const newMessage = new Message({
+            roomId: data.roomId,      // <--- SỬA THÀNH data.roomId
+            senderId: data.senderId,  // <--- SỬA THÀNH data.senderId
+            content: data.content,
+            type: (data.type || 'TEXT').toUpperCase(), 
+            fileName: data.fileName || null
+        });
+
+        // 2. Lưu vào Database
+        await newMessage.save();
+
+        // 3. Format dữ liệu trả về
+        const responseData = newMessage.formatForClient ? newMessage.formatForClient() : {
+            id: newMessage._id,
+            roomId: newMessage.roomId,
+            senderId: newMessage.senderId,
+            content: newMessage.content,
+            type: newMessage.type,
+            fileName: newMessage.fileName,
+            createdAt: new Date(newMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: newMessage.timestamp,
+            status: newMessage.status
+        };
+
+        // 4. Gửi lại cho client
+        io.to(data.roomId).emit('receive_message', responseData); // <--- Nhớ sửa data.room thành data.roomId ở đây nữa
+
+    } catch (err) {
+        console.error("❌ Lỗi lưu tin nhắn:", err.message);
+        // In chi tiết lỗi validation nếu có
+        if (err.errors) console.error(err.errors);
+    }
+});
 
     // --- 3. GỬI ẢNH (IMAGE) - TỪ CODE TEST ---
     socket.on('send_image', async (data) => {

@@ -7,26 +7,28 @@ data class Message(
     val roomId: String = "",
     val senderId: String = "",
     val content: String = "",
-    val type: String = "TEXT",
-    val createdAt: String = "", // Server đã gửi string "HH:mm" về đây rồi
+    val type: String = "TEXT",     // "TEXT", "IMAGE", "FILE"
+    val fileName: String? = null,  // <--- 1. THÊM DÒNG NÀY (để lưu tên file PDF/Word)
+    val createdAt: String = "",
     val timestamp: Long = 0L,
     val status: String = "sent"
 ) {
     companion object {
         fun fromJson(json: JSONObject): Message {
             return Message(
-                id = json.optString("id"),
+                // Lưu ý: MongoDB thường trả về "_id", kiểm tra lại server gửi "id" hay "_id"
+                id = if (json.has("id")) json.optString("id") else json.optString("_id"),
+
                 roomId = json.optString("roomId"),
-                senderId = json.optString("senderId"),
+                senderId = if (json.has("senderId")) json.optString("senderId") else json.optString("sender"),
                 content = json.optString("content"),
                 type = json.optString("type", "TEXT"),
 
-                // Lấy createdAt từ server, nếu không có thì để rỗng
+                // <--- 2. THÊM DÒNG NÀY ĐỂ LẤY TÊN FILE TỪ JSON
+                fileName = json.optString("fileName", null),
+
                 createdAt = json.optString("createdAt", ""),
-
-                // Lấy timestamp, quan trọng để sắp xếp
                 timestamp = json.optLong("timestamp", System.currentTimeMillis()),
-
                 status = json.optString("status", "sent")
             )
         }
