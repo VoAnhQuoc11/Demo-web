@@ -10,6 +10,7 @@ const roomRoutes = require('./src/routes/roomRoutes'); // <--- [MỚI] Import Ro
 const socketAuthMiddleware = require('./src/middlewares/socketAuth');
 const chatSocket = require('./src/sockets/chatSocket');
 const userRoutes = require('./src/routes/userRoutes');
+const uploadRoutes = require('./src/routes/upload');
 require('dotenv').config();
 
 const app = express();
@@ -28,7 +29,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes); // API tin nhắn cũ
 app.use('/api/rooms', roomRoutes);       // <--- [MỚI] API quản lý phòng chat
 app.use('/api/users', userRoutes); // <--- [MỚI] API quản lý user
-
+app.use('/uploads', express.static('uploads')); // Mở quyền truy cập thư mục uploads
+app.use('/api/upload', uploadRoutes); // Đăng ký API
 // 4. Khởi tạo Socket.IO
 const io = new Server(server, {
     cors: {
