@@ -109,7 +109,7 @@ fun MessageBubble(message: Message, isMe: Boolean, onSeen: () -> Unit = {}) {
                             try {
                                 // Ghép link server để tải file
                                 // Lưu ý: Thay 10.0.2.2 bằng IP máy tính của bạn nếu chạy trên điện thoại thật
-                                val fullUrl = "http://10.0.2.2:5000${message.content}"
+                                val fullUrl = "http://10.0.2.2:3000${message.content}"
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fullUrl))
                                 context.startActivity(intent)
                             } catch (e: Exception) {

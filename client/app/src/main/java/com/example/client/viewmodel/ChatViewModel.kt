@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.client.api.AuthService
@@ -165,33 +166,72 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun uploadAndSendFile(context: Context, uri: Uri) {
         viewModelScope.launch {
             try {
-                // 1. Chuyển Uri thành File
                 val file = FileUtils.getFileFromUri(context, uri)
 
                 if (file != null) {
-                    // 2. Tạo Request Body
+                    // Hiện thông báo đang gửi
+                    showToast(context, "Đang gửi file: ${file.name}...")
+
                     val requestFile = file.asRequestBody("application/octet-stream".toMediaTypeOrNull())
                     val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
 
-                    // 3. Upload lên Server (Sử dụng biến authService đã khai báo ở trên)
+                    // Gọi API Upload
                     val response = authService.uploadFile(body)
 
-                    // 4. Gửi Socket
+                    // Gửi Socket
                     val messageData = JSONObject().apply {
-                        put("room", currentRoomId)
-                        put("sender", currentUserId)
-                        put("content", response.url) // Link file từ server trả về
-                        put("type", "file")          // Đánh dấu là file
-                        put("fileName", file.name)   // Tên file gốc
+                        put("roomId", currentRoomId)
+                        put("senderId", currentUserId)
+                        put("content", response.url)
+                        put("type", "FILE")
+                        put("fileName", file.name)
                     }
-
-                    // [Sửa] Truy cập socket qua repository
                     repository.socket.emit("send_message", messageData)
+
+                    showToast(context, "Gửi thành công!")
+                } else {
+                    showToast(context, "Lỗi: Không lấy được file từ điện thoại")
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                // Bạn có thể thêm StateFlow để hiển thị lỗi lên UI nếu muốn
+                // 👇 QUAN TRỌNG: Hiện lỗi cụ thể lên màn hình để biết đường sửa
+                showToast(context, "Lỗi gửi: ${e.message}")
             }
         }
     }
+
+    // Hàm phụ trợ để hiện Toast từ background thread an toàn
+    private fun showToast(context: Context, message: String) {
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+    private val _isSearching = MutableStateFlow(false)
+    val isSearching: StateFlow<Boolean> = _isSearching
+
+    private val _searchResults = MutableStateFlow<List<Message>>(emptyList())
+    val searchResults: StateFlow<List<Message>> = _searchResults
+
+    // Hàm bật/tắt chế độ tìm kiếm
+    fun toggleSearchMode() {
+        _isSearching.value = !_isSearching.value
+        if (!_isSearching.value) {
+            _searchResults.value = emptyList() // Xóa kết quả khi tắt
+        }
+    }
+
+    // Hàm gọi API tìm kiếm
+    fun searchMessages(keyword: String) {
+        if (keyword.isBlank()) return
+
+        viewModelScope.launch {
+            try {
+                // Gọi API (đảm bảo bạn đã khởi tạo apiService đúng cách như bài trước)
+                val results = authService.searchMessages(currentRoomId, keyword)
+                _searchResults.value = results
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        }
 }
