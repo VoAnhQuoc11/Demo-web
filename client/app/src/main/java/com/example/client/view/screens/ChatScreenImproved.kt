@@ -31,31 +31,41 @@ import kotlinx.coroutines.delay
 @Composable
 fun ChatScreenImprovedScreen(
     roomId: String,
-    roomName: String,
+    roomName: String, // Tên mặc định truyền từ Navigation
     viewModel: ChatViewModel,
     onBack: () -> Unit
 ) {
     val messages by viewModel.messages.collectAsState()
     val rooms by viewModel.rooms.collectAsState()
-    val currentRoom = rooms.find { it.id == roomId }
+    val currentUserId by viewModel.currentUserIdState.collectAsState()
 
-    // Lấy UserId hiện tại từ ViewModel
-    val currentUserId = viewModel.currentUserId
+    // Tìm đối tượng phòng hiện tại từ danh sách rooms
+    val currentRoom = remember(rooms, roomId) {
+        rooms.find { it.id == roomId }
+    }
+
+    // Logic lấy tên hiển thị: Ưu tiên dùng hàm getDisplayRoomName của ViewModel
+    // Nếu chưa tìm thấy room trong danh sách, tạm thời dùng roomName từ Navigation
+    val displayTitle = remember(currentRoom, currentUserId) {
+        currentRoom?.let {
+            viewModel.getDisplayRoomName(it, currentUserId)
+        } ?: roomName
+    }
 
     var textState by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val context = LocalContext.current
 
-    // Launcher để chọn ảnh từ thư viện
+    // Launcher để chọn ảnh
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { viewModel.sendImage(context, it) }
     }
 
-    // Thiết lập phòng chat hiện tại
+    // Thiết lập phòng chat hiện tại khi vào màn hình
     LaunchedEffect(roomId) {
-        viewModel.setActiveRoom(roomId, roomName)
+        viewModel.setActiveRoom(roomId, displayTitle)
         viewModel.markRoomAsRead(roomId)
     }
 
@@ -70,7 +80,7 @@ fun ChatScreenImprovedScreen(
     Scaffold(
         topBar = {
             ChatTopBar(
-                roomName = currentRoom?.name ?: roomName,
+                roomName = displayTitle,
                 isGroup = currentRoom?.isGroup == true,
                 onBack = onBack
             )
@@ -90,7 +100,6 @@ fun ChatScreenImprovedScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(messages, key = { it.id }) { message ->
-                    // Quan trọng: Truyền currentUserId để MessageBubble tự xác định trái/phải
                     MessageBubble(
                         message = message,
                         currentUserId = currentUserId,
@@ -145,7 +154,8 @@ private fun ChatTopBar(roomName: String, isGroup: Boolean, onBack: () -> Unit) {
                     text = roomName,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
                 )
             }
         },
