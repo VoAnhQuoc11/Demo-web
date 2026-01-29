@@ -93,7 +93,7 @@ fun UsersScreenImproved(
                         rooms = filteredRooms,
                         users = friends,
                         currentUserId = currentUserId,
-                        viewModel = viewModel, // Truyền viewModel để dùng hàm lấy tên
+                        viewModel = viewModel,
                         onRoomClick = { room, displayName ->
                             viewModel.setActiveRoom(room.id, displayName)
                             onOpenChat(room.id, displayName, room.isGroup, if (room.isGroup) room.memberIds.size else null)
@@ -129,12 +129,25 @@ fun ChatList(
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         items(rooms, key = { it.id }) { room ->
-            // Tính toán tên hiển thị ngay tại đây
-            val displayName = viewModel.getDisplayRoomName(room, currentUserId)
+            // Logic xử lý tên hiển thị linh hoạt:
+            val displayName = remember(room, users, currentUserId) {
+                if (room.isGroup && room.name.isNotBlank()) {
+                    room.name
+                } else {
+                    // Nếu là chat 1-1, tìm đối phương trong danh sách member của room
+                    val partnerInRoom = room.members.find { it.id != currentUserId }
+                    // Tìm đối phương trong danh sách bạn bè (nếu members bị rỗng)
+                    val partnerId = room.memberIds.find { it != currentUserId }
+                    val friendMatch = users.find { it.id == partnerId }
+
+                    val finalPartner = partnerInRoom ?: friendMatch
+                    finalPartner?.let { it.fullName.ifBlank { it.username } } ?: "Người dùng"
+                }
+            }
 
             ChatItem(
                 room = room,
-                displayName = displayName, // Truyền tên đã xử lý vào
+                displayName = displayName,
                 users = users,
                 currentUserId = currentUserId,
                 onClick = { onRoomClick(room, displayName) }
@@ -188,7 +201,7 @@ fun ChatItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = displayName, // Sử dụng displayName thay vì room.name
+                        text = displayName,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
                         maxLines = 1,
@@ -212,7 +225,6 @@ fun ChatItem(
                 )
             }
 
-            // Hiển thị chấm đỏ nếu có tin nhắn chưa đọc
             if (room.unreadCount > 0) {
                 Spacer(Modifier.width(8.dp))
                 Surface(
@@ -234,7 +246,6 @@ fun ChatItem(
     }
 }
 
-// Các Component phụ giữ nguyên nhưng đảm bảo import đầy đủ
 @Composable
 private fun ChatItemAvatar(room: ChatRoom, isOnline: Boolean) {
     Box {

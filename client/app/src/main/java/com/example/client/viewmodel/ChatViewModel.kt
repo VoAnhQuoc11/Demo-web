@@ -183,24 +183,26 @@ class ChatViewModel(
     // Trong ChatViewModel.kt hoặc khi vẽ UI Compose:
 
     fun getDisplayRoomName(room: ChatRoom, currentUserId: String): String {
-        if (room.isGroup && room.name.isNotBlank()) return room.name
+        // 1. Nếu là nhóm: Giữ nguyên tên nhóm do người tạo đặt
+        if (room.isGroup) {
+            return room.name.ifBlank { "Nhóm không tên" }
+        }
 
-        // 1. Kiểm tra mảng members có dữ liệu không
-        if (room.members.isEmpty()) return "Cuộc trò chuyện"
-
-        // 2. Tìm đối phương (Partner)
-        // Dùng trim() để loại bỏ khoảng trắng dư thừa nếu có
+        // 2. Nếu là room 1-1: Tìm thông tin đối phương (Partner)
+        // Ưu tiên tìm trong danh sách members của room
         val partner = room.members.find { it.id.trim() != currentUserId.trim() }
 
-        // 3. Xử lý kết quả trả về an toàn
-        return if (partner != null) {
+        if (partner != null) {
             val name = partner.fullName.ifBlank { partner.username }
-            if (name.isNotBlank()) name else "Người dùng"
-        } else {
-            // Nếu không tìm thấy ai khác, có thể bạn đang chat với chính mình
-            val me = room.members.find { it.id.trim() == currentUserId.trim() }
-            me?.fullName?.ifBlank { me.username } ?: "Người dùng"
+            if (name.isNotBlank()) return name
         }
+
+        // 3. Dự phòng: Nếu members trống, thử tìm trong danh sách bạn bè (friends) bằng memberIds
+        val partnerId = room.memberIds.find { it != currentUserId }
+        val friendMatch = friends.value.find { it.id == partnerId }
+
+        return friendMatch?.let { it.fullName.ifBlank { it.username } }
+            ?: "Người dùng" // Trả về mặc định nếu không tìm thấy dữ liệu
     }
     fun onUserInputChanged(text: String) {
         // Logic xử lý khi người dùng đang nhập (typing...) nếu cần
