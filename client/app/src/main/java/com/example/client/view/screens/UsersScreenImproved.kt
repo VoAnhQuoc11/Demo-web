@@ -14,11 +14,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.client.model.data.ChatRoom
 import com.example.client.model.data.User
 import com.example.client.view.theme.*
@@ -129,25 +133,26 @@ fun ChatList(
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         items(rooms, key = { it.id }) { room ->
-            // Logic xử lý tên hiển thị linh hoạt:
-            val displayName = remember(room, users, currentUserId) {
+            val partner = remember(room, users, currentUserId) {
+                if (room.isGroup) null
+                else {
+                    room.members.find { it.id.trim() != currentUserId.trim() }
+                        ?: users.find { it.id == room.memberIds.find { id -> id != currentUserId } }
+                }
+            }
+
+            val displayName = remember(room, partner) {
                 if (room.isGroup && room.name.isNotBlank()) {
                     room.name
                 } else {
-                    // Nếu là chat 1-1, tìm đối phương trong danh sách member của room
-                    val partnerInRoom = room.members.find { it.id != currentUserId }
-                    // Tìm đối phương trong danh sách bạn bè (nếu members bị rỗng)
-                    val partnerId = room.memberIds.find { it != currentUserId }
-                    val friendMatch = users.find { it.id == partnerId }
-
-                    val finalPartner = partnerInRoom ?: friendMatch
-                    finalPartner?.let { it.fullName.ifBlank { it.username } } ?: "Người dùng"
+                    partner?.let { it.fullName.ifBlank { it.username } } ?: "Người dùng"
                 }
             }
 
             ChatItem(
                 room = room,
                 displayName = displayName,
+                partner = partner,
                 users = users,
                 currentUserId = currentUserId,
                 onClick = { onRoomClick(room, displayName) }
@@ -160,6 +165,7 @@ fun ChatList(
 fun ChatItem(
     room: ChatRoom,
     displayName: String,
+    partner: User?,
     users: List<User>,
     currentUserId: String,
     onClick: () -> Unit
@@ -190,7 +196,12 @@ fun ChatItem(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ChatItemAvatar(room, isOnline = isOtherUserOnline)
+            ChatItemAvatar(
+                room = room,
+                isOnline = isOtherUserOnline,
+                partner = partner,
+                displayName = displayName
+            )
 
             Spacer(Modifier.width(12.dp))
 
@@ -247,7 +258,12 @@ fun ChatItem(
 }
 
 @Composable
-private fun ChatItemAvatar(room: ChatRoom, isOnline: Boolean) {
+private fun ChatItemAvatar(
+    room: ChatRoom,
+    isOnline: Boolean,
+    partner: User?,
+    displayName: String
+) {
     Box {
         Surface(
             modifier = Modifier.size(56.dp),
@@ -255,12 +271,37 @@ private fun ChatItemAvatar(room: ChatRoom, isOnline: Boolean) {
             color = if (room.isGroup) Color(0xFFE0F2F1) else TealLight
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = if (room.isGroup) Icons.Default.Group else Icons.Default.Person,
-                    contentDescription = null,
-                    tint = TealPrimary,
-                    modifier = Modifier.size(28.dp)
-                )
+                if (!room.isGroup) {
+                    val avatarUrl = partner?.avatarUrl
+                    if (!avatarUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = "Avatar",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        // Hiển thị chữ cái đầu tên người dùng (giống logic Profile)
+                        val firstChar = displayName.trim().firstOrNull()?.uppercase() ?: "?"
+                        Text(
+                            text = firstChar.toString(),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = TealPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    // Icon nhóm mặc định
+                    Icon(
+                        imageVector = Icons.Default.Group,
+                        contentDescription = null,
+                        tint = TealPrimary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
         if (isOnline) {
