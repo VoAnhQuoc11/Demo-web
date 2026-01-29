@@ -1,4 +1,6 @@
-﻿package com.example.client.view.screens
+﻿@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
+package com.example.client.view.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,7 +27,6 @@ import com.example.client.model.data.User
 import com.example.client.view.theme.*
 import com.example.client.viewmodel.ChatViewModel
 import com.example.client.viewmodel.ContactViewModel
-import kotlinx.coroutines.delay
 
 // Link ảnh mặc định để kiểm tra đồng bộ hệ thống
 const val DEFAULT_AVATAR_NEW_MESSAGE = "https://i.imgur.com/6VBx3io.png"
@@ -34,17 +35,15 @@ const val DEFAULT_AVATAR_NEW_MESSAGE = "https://i.imgur.com/6VBx3io.png"
 @Composable
 fun NewMessageScreen(
     chatViewModel: ChatViewModel,
-    contactViewModel: ContactViewModel,
+    contactViewModel: ContactViewModel, // Vẫn giữ tham số để tránh lỗi điều hướng, nhưng không dùng remote search
     onBack: () -> Unit,
     onUserSelected: (User) -> Unit,
     onAddContact: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
-    // State từ ViewModels
+    // Lấy danh sách bạn bè từ ChatViewModel (Local Data)
     val friends by chatViewModel.friends.collectAsState()
-    val searchResults by contactViewModel.searchResults.collectAsState()
-    val isSearchingRemote by contactViewModel.isSearching.collectAsState()
 
     // State quản lý tạo nhóm
     var selectedUserIds by remember { mutableStateOf(setOf<String>()) }
@@ -52,28 +51,21 @@ fun NewMessageScreen(
     var showGroupNameDialog by remember { mutableStateOf(false) }
     var groupName by remember { mutableStateOf("") }
 
-    // Logic tìm kiếm
-    LaunchedEffect(searchQuery) {
-        if (searchQuery.isBlank()) {
-            contactViewModel.clearSearchResults()
-            return@LaunchedEffect
-        }
-        delay(500)
-        contactViewModel.searchUsers(searchQuery)
-    }
-
     LaunchedEffect(Unit) {
         chatViewModel.refreshData()
     }
 
-    val isSearchMode = searchQuery.isNotBlank()
-
-    // Logic lọc danh sách hiển thị
-    val displayedUsers = remember(searchQuery, searchResults, friends) {
-        if (isSearchMode) {
-            searchResults.filter { it.id != chatViewModel.currentUserId }
+    // Logic lọc danh sách: CHỈ tìm kiếm trong danh sách friends hiện có
+    val displayedUsers = remember(searchQuery, friends) {
+        val allFriendsExceptMe = friends.filter { it.id != chatViewModel.currentUserId }
+        if (searchQuery.isBlank()) {
+            allFriendsExceptMe
         } else {
-            friends.filter { it.id != chatViewModel.currentUserId }
+            allFriendsExceptMe.filter { user ->
+                val fullName = user.fullName.ifBlank { user.username }
+                fullName.contains(searchQuery, ignoreCase = true) ||
+                        user.username.contains(searchQuery, ignoreCase = true)
+            }
         }
     }
 
@@ -124,21 +116,28 @@ fun NewMessageScreen(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Thanh tìm kiếm
+            // Thanh tìm kiếm (Lọc local)
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                placeholder = { Text("Tìm kiếm...") },
+                placeholder = { Text("Tìm trong danh sách bạn bè...") },
                 leadingIcon = { Icon(Icons.Default.Search, null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, null)
+                        }
+                    }
+                },
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true
             )
 
-            // Quick Actions (Ẩn khi đang chọn nhóm)
-            if (!isSearchMode && !isGroupMode) {
+            // Quick Actions (Chỉ hiện khi không tìm kiếm và không chọn nhóm)
+            if (searchQuery.isBlank() && !isGroupMode) {
                 QuickActionButtons(
                     onCreateGroup = { isGroupMode = true },
                     onAddContact = onAddContact
@@ -147,49 +146,33 @@ fun NewMessageScreen(
             }
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                if (isSearchMode && isSearchingRemote) {
+                if (displayedUsers.isEmpty()) {
                     item {
-                        Box(Modifier.fillMaxWidth().padding(32.dp), Alignment.Center) {
-                            CircularProgressIndicator(color = TealPrimary)
-                        }
-                    }
-                } else if (displayedUsers.isEmpty()) {
-                    item {
-                        if (isSearchMode) EmptySearchResult() else EmptyContactList()
+                        if (searchQuery.isBlank()) EmptyContactList() else EmptySearchResult()
                     }
                 } else {
                     item {
-                        SectionHeader(if (isSearchMode) "Kết quả tìm kiếm" else "Bạn bè của bạn")
+                        SectionHeader(if (searchQuery.isBlank()) "Bạn bè của bạn" else "Kết quả lọc")
                     }
 
                     items(displayedUsers) { user ->
-                        val isFriend = friends.any { it.id == user.id }
                         val isSelected = selectedUserIds.contains(user.id)
 
                         NewMessageContactRow(
                             contact = user,
                             isSelected = isSelected,
-                            // Nút kết bạn chỉ hiện khi search thấy người lạ (không phải bạn)
-                            showFriendRequestButton = isSearchMode && !isFriend,
                             onClick = {
                                 if (isGroupMode || isSelected) {
                                     // Chế độ chọn thành viên nhóm
-                                    if (isFriend) {
-                                        selectedUserIds = if (isSelected) {
-                                            selectedUserIds - user.id
-                                        } else {
-                                            selectedUserIds + user.id
-                                        }
+                                    selectedUserIds = if (isSelected) {
+                                        selectedUserIds - user.id
+                                    } else {
+                                        selectedUserIds + user.id
                                     }
                                 } else {
                                     // Chế độ nhắn tin 1-1
-                                    if (isFriend) {
-                                        onUserSelected(user)
-                                    }
+                                    onUserSelected(user)
                                 }
-                            },
-                            onSendFriendRequest = {
-                                contactViewModel.sendFriendRequest(user.id) {}
                             }
                         )
                     }
@@ -219,13 +202,12 @@ fun NewMessageScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        // Gọi hàm tạo nhóm chat mới từ ChatViewModel
                         chatViewModel.createNewGroup(
                             name = groupName.ifBlank { "Nhóm mới" },
                             selectedMemberIds = selectedUserIds.toList()
                         )
                         showGroupNameDialog = false
-                        onBack() // Quay về list room
+                        onBack()
                     },
                     enabled = groupName.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(containerColor = TealPrimary)
@@ -255,9 +237,7 @@ fun SectionHeader(title: String) {
 fun NewMessageContactRow(
     contact: User,
     isSelected: Boolean,
-    showFriendRequestButton: Boolean,
-    onClick: () -> Unit,
-    onSendFriendRequest: () -> Unit
+    onClick: () -> Unit
 ) {
     Surface(
         onClick = onClick,
@@ -271,7 +251,7 @@ fun NewMessageContactRow(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ĐÃ SỬA: Hiển thị avatar từ database hoặc chữ cái đầu
+            // Hiển thị avatar từ database hoặc chữ cái đầu
             Surface(
                 modifier = Modifier.size(48.dp),
                 shape = CircleShape,
@@ -292,7 +272,7 @@ fun NewMessageContactRow(
                     } else {
                         val displayName = contact.fullName.ifBlank { contact.username }
                         Text(
-                            text = displayName.take(1).uppercase(),
+                            text = displayName.trim().take(1).uppercase(),
                             fontWeight = FontWeight.Bold,
                             color = TealPrimary,
                             fontSize = 18.sp
@@ -312,15 +292,6 @@ fun NewMessageContactRow(
             }
             if (isSelected) {
                 Icon(Icons.Default.CheckCircle, null, tint = TealPrimary, modifier = Modifier.size(28.dp))
-            } else if (showFriendRequestButton) {
-                Button(
-                    onClick = onSendFriendRequest,
-                    colors = ButtonDefaults.buttonColors(containerColor = TealPrimary),
-                    contentPadding = PaddingValues(horizontal = 12.dp),
-                    modifier = Modifier.height(32.dp)
-                ) {
-                    Text("Kết bạn", fontSize = 11.sp)
-                }
             }
         }
     }
@@ -358,7 +329,7 @@ fun QuickActionButtons(onCreateGroup: () -> Unit, onAddContact: () -> Unit) {
 @Composable
 fun EmptySearchResult() {
     Text(
-        "Không tìm thấy người dùng",
+        "Không tìm thấy bạn bè nào khớp với từ khóa",
         Modifier
             .fillMaxWidth()
             .padding(32.dp),
@@ -378,7 +349,7 @@ fun EmptyContactList() {
         Icon(Icons.Default.PeopleOutline, null, Modifier.size(48.dp), tint = Color.LightGray)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Bạn chưa có bạn bè nào để tạo nhóm",
+            "Danh sách bạn bè trống",
             textAlign = TextAlign.Center,
             color = Color.Gray
         )

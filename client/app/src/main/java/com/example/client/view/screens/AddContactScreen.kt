@@ -84,7 +84,7 @@ fun AddNewContactScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Nhập số điện...") },
+                placeholder = { Text("Nhập số điện thoại...") },
                 leadingIcon = {
                     Icon(Icons.Default.PersonSearch, contentDescription = null, tint = TealPrimary)
                 },
