@@ -6,11 +6,12 @@ data class Message(
     val id: String = "",
     val roomId: String = "",
     val senderId: String = "",
+    val senderName: String = "",   // Thêm trường này
+    val senderAvatar: String = "",
     val content: String = "",
     val type: String = "TEXT",
     val createdAt: String = "", // Server đã gửi string "HH:mm" về đây rồi
     val timestamp: Long = 0L,
-    val senderName: String = "",
     val status: String = "sent"
 ) {
     companion object {

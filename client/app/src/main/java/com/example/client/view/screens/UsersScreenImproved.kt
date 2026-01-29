@@ -30,6 +30,9 @@ import com.example.client.viewmodel.ChatViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
+// Định nghĩa link ảnh mặc định để kiểm tra
+const val DEFAULT_AVATAR_URL = "https://i.imgur.com/6VBx3io.png"
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun UsersScreenImproved(
@@ -273,7 +276,8 @@ private fun ChatItemAvatar(
             Box(contentAlignment = Alignment.Center) {
                 if (!room.isGroup) {
                     val avatarUrl = partner?.avatarUrl
-                    if (!avatarUrl.isNullOrBlank()) {
+                    // Kiểm tra: Nếu có ảnh VÀ ảnh đó không phải ảnh mặc định
+                    if (!avatarUrl.isNullOrBlank() && avatarUrl != DEFAULT_AVATAR_URL) {
                         AsyncImage(
                             model = avatarUrl,
                             contentDescription = "Avatar",

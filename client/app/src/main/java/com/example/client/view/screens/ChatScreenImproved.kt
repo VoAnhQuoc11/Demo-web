@@ -16,16 +16,24 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.client.model.data.Message
+import com.example.client.model.data.User
 import com.example.client.view.components.MessageBubble
 import com.example.client.view.theme.*
 import com.example.client.viewmodel.ChatViewModel
 import kotlinx.coroutines.delay
+
+// Hằng số link ảnh mặc định để kiểm tra
+const val DEFAULT_AVATAR_URL_CHAT = "https://i.imgur.com/6VBx3io.png"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,19 +45,30 @@ fun ChatScreenImprovedScreen(
 ) {
     val messages by viewModel.messages.collectAsState()
     val rooms by viewModel.rooms.collectAsState()
+    val friends by viewModel.friends.collectAsState()
     val currentUserId by viewModel.currentUserIdState.collectAsState()
 
-    // Tìm đối tượng phòng hiện tại từ danh sách rooms
+    // Tìm đối tượng phòng hiện tại
     val currentRoom = remember(rooms, roomId) {
         rooms.find { it.id == roomId }
     }
 
-    // Logic lấy tên hiển thị: Ưu tiên dùng hàm getDisplayRoomName của ViewModel
-    // Nếu chưa tìm thấy room trong danh sách, tạm thời dùng roomName từ Navigation
-    val displayTitle = remember(currentRoom, currentUserId) {
-        currentRoom?.let {
-            viewModel.getDisplayRoomName(it, currentUserId)
-        } ?: roomName
+    // Tìm thông tin đối phương (Partner) để lấy avatarUrl
+    val partner = remember(currentRoom, friends, currentUserId) {
+        if (currentRoom?.isGroup == true) null
+        else {
+            currentRoom?.members?.find { it.id != currentUserId }
+                ?: friends.find { it.id == currentRoom?.memberIds?.find { id -> id != currentUserId } }
+        }
+    }
+
+    // Tên hiển thị trên thanh tiêu đề
+    val displayTitle = remember(currentRoom, partner) {
+        if (currentRoom?.isGroup == true && currentRoom.name.isNotBlank()) {
+            currentRoom.name
+        } else {
+            partner?.let { it.fullName.ifBlank { it.username } } ?: roomName
+        }
     }
 
     var textState by remember { mutableStateOf("") }
@@ -82,6 +101,7 @@ fun ChatScreenImprovedScreen(
             ChatTopBar(
                 roomName = displayTitle,
                 isGroup = currentRoom?.isGroup == true,
+                partner = partner,
                 onBack = onBack
             )
         }
@@ -103,6 +123,7 @@ fun ChatScreenImprovedScreen(
                     MessageBubble(
                         message = message,
                         currentUserId = currentUserId,
+                        viewModel = viewModel,
                         onSeen = { viewModel.markAsSeen(message) }
                     )
                 }
@@ -131,25 +152,56 @@ fun ChatScreenImprovedScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChatTopBar(roomName: String, isGroup: Boolean, onBack: () -> Unit) {
+private fun ChatTopBar(
+    roomName: String,
+    isGroup: Boolean,
+    partner: User?,
+    onBack: () -> Unit
+) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // AVATAR HOẶC CHỮ CÁI ĐẦU CẠNH NÚT BACK
                 Surface(
                     modifier = Modifier.size(36.dp),
                     shape = CircleShape,
                     color = if (isGroup) Color(0xFFE0F2F1) else TealLight
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            if (isGroup) Icons.Default.Group else Icons.Default.Person,
-                            contentDescription = null,
-                            tint = TealPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        if (!isGroup) {
+                            val avatarUrl = partner?.avatarUrl
+                            if (!avatarUrl.isNullOrBlank() && avatarUrl != DEFAULT_AVATAR_URL_CHAT) {
+                                AsyncImage(
+                                    model = avatarUrl,
+                                    contentDescription = "Avatar",
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                // Hiển thị chữ cái đầu tên (Ví dụ: H cho Hau)
+                                val firstChar = roomName.trim().firstOrNull()?.uppercase() ?: "?"
+                                Text(
+                                    text = firstChar.toString(),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TealPrimary,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        } else {
+                            // Icon nhóm mặc định
+                            Icon(
+                                imageVector = Icons.Default.Group,
+                                contentDescription = null,
+                                tint = TealPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
-                Spacer(Modifier.width(10.dp))
+
+                Spacer(Modifier.width(12.dp))
+
                 Text(
                     text = roomName,
                     fontWeight = FontWeight.Bold,

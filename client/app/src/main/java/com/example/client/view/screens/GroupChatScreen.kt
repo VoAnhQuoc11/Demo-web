@@ -92,6 +92,7 @@ fun GroupChatScreen(
                     MessageBubble(
                         message = message,
                         currentUserId = currentUserId,
+                        viewModel = viewModel,
                         onSeen = { viewModel.markAsSeen(message) }
                     )
                 }
