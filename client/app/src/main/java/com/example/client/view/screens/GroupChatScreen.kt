@@ -2,6 +2,7 @@
 
 package com.example.client.view.screens
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,7 +41,7 @@ fun GroupChatScreen(
     onBack: () -> Unit
 ) {
     val messages by viewModel.messages.collectAsState()
-    val currentUserId = viewModel.currentUserId // Lấy ID của user hiện tại
+    val currentUserId = viewModel.currentUserId
 
     var textState by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -88,7 +89,6 @@ fun GroupChatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(messages, key = { it.id }) { message ->
-                    // Cập nhật quan trọng: Truyền currentUserId để xác định vị trí chính xác
                     MessageBubble(
                         message = message,
                         currentUserId = currentUserId,
@@ -128,25 +128,28 @@ private fun ChatTopBar(
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // HIỂN THỊ ICON NHÓM MẶC ĐỊNH GIỐNG MÀN USERS SCREEN IMPROVED
                 Surface(
                     modifier = Modifier.size(40.dp),
                     shape = CircleShape,
-                    color = TealLight
+                    color = Color(0xFFE0F2F1) // Màu nền Teal nhạt đồng bộ
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = roomName.firstOrNull()?.uppercase() ?: "G",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TealPrimary
+                        Icon(
+                            imageVector = Icons.Default.Group,
+                            contentDescription = null,
+                            tint = TealPrimary,
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 }
+
                 Spacer(Modifier.width(12.dp))
+
                 Text(
                     text = roomName,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = 17.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
@@ -157,8 +160,8 @@ private fun ChatTopBar(
             }
         },
         actions = {
-            IconButton(onClick = { /* Group settings */ }) {
-                Icon(Icons.Default.Info, "Info", tint = MaterialTheme.colorScheme.onSurface)
+            IconButton(onClick = { /* Info */ }) {
+                Icon(Icons.Default.Info, "Info", tint = TealPrimary)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(

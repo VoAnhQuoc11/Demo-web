@@ -12,13 +12,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.client.model.data.User
 import com.example.client.view.theme.*
 import com.example.client.viewmodel.ContactViewModel
+
+// Hằng số link ảnh mặc định để kiểm tra đồng bộ hệ thống
+const val DEFAULT_AVATAR_ADD_CONTACT = "https://i.imgur.com/6VBx3io.png"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,7 +84,7 @@ fun AddNewContactScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Nhập số điện thoại hoặc username...") },
+                placeholder = { Text("Nhập số điện...") },
                 leadingIcon = {
                     Icon(Icons.Default.PersonSearch, contentDescription = null, tint = TealPrimary)
                 },
@@ -183,15 +189,30 @@ fun SearchResultItem(user: User, onAddFriend: () -> Unit) {
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar
+            // ĐÃ CẬP NHẬT: Hiển thị Avatar từ link Database hoặc Chữ cái đầu
             Surface(modifier = Modifier.size(50.dp), shape = CircleShape, color = TealLight) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = user.username.take(1).uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        color = TealPrimary,
-                        fontSize = 20.sp
-                    )
+                    val avatarUrl = user.avatarUrl
+
+                    if (!avatarUrl.isNullOrBlank() && avatarUrl != DEFAULT_AVATAR_ADD_CONTACT) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = "Avatar",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        // Hiện chữ cái đầu nếu không có ảnh hoặc là ảnh mặc định Imgur
+                        val displayName = user.fullName.ifBlank { user.username }
+                        Text(
+                            text = displayName.trim().take(1).uppercase(),
+                            fontWeight = FontWeight.Bold,
+                            color = TealPrimary,
+                            fontSize = 20.sp
+                        )
+                    }
                 }
             }
 

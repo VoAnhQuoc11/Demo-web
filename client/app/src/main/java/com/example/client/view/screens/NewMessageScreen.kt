@@ -13,16 +13,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.client.model.data.User
 import com.example.client.view.theme.*
 import com.example.client.viewmodel.ChatViewModel
 import com.example.client.viewmodel.ContactViewModel
 import kotlinx.coroutines.delay
+
+// Link ảnh mặc định để kiểm tra đồng bộ hệ thống
+const val DEFAULT_AVATAR_NEW_MESSAGE = "https://i.imgur.com/6VBx3io.png"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -265,15 +271,36 @@ fun NewMessageContactRow(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = TealLight) {
+            // ĐÃ SỬA: Hiển thị avatar từ database hoặc chữ cái đầu
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = TealLight
+            ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        contact.username.take(1).uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        color = TealPrimary
-                    )
+                    val avatarUrl = contact.avatarUrl
+
+                    if (!avatarUrl.isNullOrBlank() && avatarUrl != DEFAULT_AVATAR_NEW_MESSAGE) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = "Avatar",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        val displayName = contact.fullName.ifBlank { contact.username }
+                        Text(
+                            text = displayName.take(1).uppercase(),
+                            fontWeight = FontWeight.Bold,
+                            color = TealPrimary,
+                            fontSize = 18.sp
+                        )
+                    }
                 }
             }
+
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(
