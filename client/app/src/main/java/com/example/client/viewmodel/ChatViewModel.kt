@@ -101,13 +101,7 @@ class ChatViewModel(
         val finalMembers = selectedMemberIds.toMutableList().apply {
             if (!contains(currentUserId)) add(currentUserId)
         }
-
         repository.createChatGroup(name, finalMembers)
-
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(800)
-            refreshRooms()
-        }
     }
 
     // Gửi tin nhắn hình ảnh

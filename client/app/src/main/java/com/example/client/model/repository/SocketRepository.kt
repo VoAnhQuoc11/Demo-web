@@ -67,9 +67,6 @@ class SocketRepository(
                 socketScope.launch {
                     socket?.emit("join", "")
                     socket?.emit("list_users")
-
-                    // SỬA: Không gửi tham số "" nữa, hoặc gửi null
-                    // Vì Server đã được sửa để tự lấy ID của mình nếu không có tham số
                     socket?.emit("list_rooms")
                 }
             }
@@ -138,6 +135,32 @@ class SocketRepository(
 
             on(Socket.EVENT_DISCONNECT) {
                 Log.d(TAG, "⚠️ Socket Disconnected")
+            }
+            on("room_updated") { args ->
+                if (args.isNotEmpty() && args[0] is JSONObject) {
+                    val obj = args[0] as JSONObject
+                    try {
+                        // 1. Parse JSON nhận được thành đối tượng ChatRoom
+                        val newRoom = parseSingleRoom(obj)
+
+                        // 2. Cập nhật danh sách phòng hiện tại trong StateFlow
+                        val currentRooms = _rooms.value.toMutableList()
+
+                        // Nếu phòng đã tồn tại thì cập nhật, nếu chưa thì thêm vào đầu
+                        val index = currentRooms.indexOfFirst { it.id == newRoom.id }
+                        if (index != -1) {
+                            currentRooms[index] = newRoom
+                        } else {
+                            currentRooms.add(0, newRoom)
+                        }
+
+                        // 3. Đẩy list mới vào StateFlow để UI (Compose) tự động vẽ lại
+                        _rooms.value = currentRooms
+                        Log.d(TAG, "Cập nhật danh sách phòng từ room_updated: ${newRoom.name}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Lỗi parse room_updated: ${e.message}")
+                    }
+                }
             }
 
             // Bắt đầu kết nối
@@ -292,6 +315,27 @@ class SocketRepository(
         }
         return out
     }
+    private fun parseSingleRoom(obj: JSONObject): ChatRoom {
+        val id = obj.optString("_id").ifBlank { obj.optString("id") }
+        val memberIds = mutableListOf<String>()
+        val membersJson = obj.optJSONArray("members")
+        if (membersJson != null) {
+            for(j in 0 until membersJson.length()) {
+                val m = membersJson.opt(j)
+                if(m is String) memberIds.add(m)
+                else if(m is JSONObject) memberIds.add(m.optString("_id"))
+            }
+        }
+        return ChatRoom(
+            id = id,
+            name = obj.optString("name"),
+            isGroup = obj.optBoolean("isGroup", false),
+            memberIds = memberIds,
+            lastMessage = obj.optString("lastMessage", "Nhóm mới tạo"),
+            isPinned = obj.optBoolean("isPinned", false)
+        )
+    }
+
 
     private fun appendMessage(message: Message) {
         // 1. Lấy danh sách hiện tại hoặc tạo mới
