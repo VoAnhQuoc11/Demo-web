@@ -7,12 +7,13 @@ import com.example.client.model.ApiService
 import com.example.client.model.FriendRequest
 import com.example.client.model.RetrofitClient
 import com.example.client.model.data.User
+import com.example.client.model.repository.SocketRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class ContactViewModel : ViewModel() {
+class ContactViewModel(private val repository: SocketRepository) : ViewModel() {
 
     private val apiService: ApiService = RetrofitClient.instance
     private var authToken: String = ""
@@ -88,6 +89,10 @@ class ContactViewModel : ViewModel() {
                 val response = apiService.acceptFriendRequest("Bearer $authToken", FriendRequest(userId))
                 if (response.success) {
                     fetchPendingRequests()
+
+                    // GỌI DÒNG NÀY để phát tín hiệu cho ChatViewModel
+                    repository.triggerDataRefresh()
+
                     launch(Dispatchers.Main) { onSuccess() }
                 }
             } catch (e: Exception) {

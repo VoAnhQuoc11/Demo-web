@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -286,6 +287,19 @@ class SocketRepository(
         }
         return out
     }
+    // ... các StateFlow có sẵn
+
+    // THÊM DÒNG NÀY:
+    private val _dataRefreshEvent = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(replay = 0)
+    val dataRefreshEvent = _dataRefreshEvent.asSharedFlow()
+    // THÊM HÀM NÀY:
+    fun triggerDataRefresh() {
+        socketScope.launch {
+            _dataRefreshEvent.emit(Unit)
+            Log.d(TAG, "Đã phát tín hiệu làm mới dữ liệu hệ thống")
+        }
+    }
+
 
     private fun parseRoomsArray(arr: JSONArray): List<ChatRoom> {
         val out = mutableListOf<ChatRoom>()

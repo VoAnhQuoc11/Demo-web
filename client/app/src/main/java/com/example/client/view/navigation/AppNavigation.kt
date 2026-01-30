@@ -36,7 +36,17 @@ fun AppNavigation() {
             }
         }
     )
-    val contactViewModel: ContactViewModel = viewModel()
+
+    // SỬA ĐOẠN NÀY: Thay 'val contactViewModel: ContactViewModel = viewModel()' bằng đoạn dưới đây
+    val contactViewModel: ContactViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                // Truyền repository vào để ContactViewModel có thể phát tín hiệu làm mới dữ liệu
+                return ContactViewModel(repository) as T
+            }
+        }
+    )
+
 
     // 4. Thiết lập kết nối khi mở App
     LaunchedEffect(Unit) {

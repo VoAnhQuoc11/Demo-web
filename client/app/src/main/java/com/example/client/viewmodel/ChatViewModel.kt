@@ -57,6 +57,12 @@ class ChatViewModel(
     init {
         // Yêu cầu danh sách phòng ngay khi khởi tạo
         refreshRooms()
+        viewModelScope.launch {
+            repository.dataRefreshEvent.collect {
+                Log.d(TAG, "Nhận tín hiệu làm mới: Đang tải lại dữ liệu...")
+                refreshData() // Hàm này sẽ gọi refreshRooms() và requestOnlineUsers()
+            }
+        }
 
         // Lắng nghe tin nhắn mới để cập nhật UI
         viewModelScope.launch(Dispatchers.IO) {
