@@ -1,6 +1,6 @@
 // src/services/ChatService.js
 // Business logic for chat operations - hoc tu Ktor Clean Architecture
-
+const User = require('../models/User');
 const { UserRepository, RoomRepository, MessageRepository } = require('../repositories');
 
 class ChatService {
@@ -34,9 +34,28 @@ class ChatService {
         return await UserRepository.updateOnlineStatus(userId, isOnline);
     }
     
-    async updateUserProfile(userId, profileData) {
-        return await UserRepository.updateProfile(userId, profileData);
+// Ví dụ trong ChatService.js cần phải như thế này:
+// server/src/services/ChatService.js
+async updateUserProfile(userId, updateData) {
+    try {
+        // Tạo object chứa các trường cần cập nhật để tránh ghi đè dữ liệu cũ
+        const updates = {};
+        if (updateData.fullName) updates.fullName = updateData.fullName;
+        if (updateData.avatarUrl) updates.avatarUrl = updateData.avatarUrl;
+
+        // Sử dụng User model đã import để update
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $set: updates },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        return updatedUser;
+    } catch (error) {
+        // Lỗi này sẽ được catch bởi controller và trả về 500 kèm message chi tiết
+        throw new Error("Lỗi khi cập nhật database: " + error.message);
     }
+}
     
     // ROOM OPERATIONS
     async getUserRooms(userId) {

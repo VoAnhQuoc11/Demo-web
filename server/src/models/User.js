@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     phoneNumber: { type: String, default: "", trim: true, index: true },
     fullName: { type: String, default: "" },
-    avatarUrl: { type: String, default: "https://i.imgur.com/6VBx3io.png" },
+    avatarUrl: { type: String, default: "" },
     isOnline: { type: Boolean, default: false },
     // MỚI:
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

@@ -37,7 +37,6 @@ import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.io.ByteArrayOutputStream
-import java.io.InputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,13 +45,17 @@ fun ProfileScreen(
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
-    val sharedPref = context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE)
+    val sharedPref = remember { context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE) }
+    LaunchedEffect(Unit) {
+        val savedAvatar = sharedPref.getString("AVATAR_URL", "")
+        Log.d("PROFILE_DEBUG", "Avatar hiện tại trong máy: ${savedAvatar?.take(20)}...")
+    }
 
+    // State đồng bộ từ SharedPreferences
     var currentUsername by remember {
         mutableStateOf(sharedPref.getString("USERNAME", "Unknown User") ?: "User")
     }
 
-    // State lưu Avatar URL hiện tại (có thể là link hoặc base64 từ server)
     var currentAvatarUrl by remember {
         mutableStateOf(sharedPref.getString("AVATAR_URL", "") ?: "")
     }
@@ -60,25 +63,43 @@ fun ProfileScreen(
     var showEditNameDialog by remember { mutableStateOf(false) }
     var newNameInput by remember { mutableStateOf(currentUsername) }
 
-    // Launcher để chọn ảnh từ thư viện thiết bị
+    // Tối ưu hóa Model cho AsyncImage: Chuyển Base64 thành ByteArray để Coil không bị lỗi parser
+    val imageModel = remember(currentAvatarUrl) {
+        if (currentAvatarUrl.startsWith("data:image")) {
+            try {
+                // Tách bỏ phần "data:image/png;base64," lấy phần mã hóa phía sau
+                val base64String = currentAvatarUrl.substringAfter(",")
+                Base64.decode(base64String, Base64.DEFAULT)
+            } catch (e: Exception) {
+                Log.e("COIL_DEBUG", "Giải mã Base64 thất bại: ${e.message}")
+                currentAvatarUrl
+            }
+        } else {
+            currentAvatarUrl // Nếu là đường dẫn URL bình thường
+        }
+    }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
             val base64Image = uriToBase64Png(context, it)
             if (base64Image != null) {
-                // Gọi API cập nhật ảnh ngay khi chọn xong
+                val oldAvatar = currentAvatarUrl
+                // Cập nhật UI ngay lập tức
+                currentAvatarUrl = base64Image
+
                 updateUserProfile(
                     context = context,
                     newName = currentUsername,
                     newAvatar = base64Image,
                     onSuccess = {
-                        currentAvatarUrl = base64Image
                         sharedPref.edit().putString("AVATAR_URL", base64Image).apply()
                         Toast.makeText(context, "Cập nhật ảnh thành công!", Toast.LENGTH_SHORT).show()
                     },
                     onFailure = { err ->
-                        Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                        currentAvatarUrl = oldAvatar // Hoàn tác nếu lỗi
+                        Toast.makeText(context, "Lỗi Server: $err", Toast.LENGTH_LONG).show()
                     }
                 )
             }
@@ -104,7 +125,7 @@ fun ProfileScreen(
                         updateUserProfile(
                             context = context,
                             newName = newNameInput,
-                            newAvatar = null, // Giữ nguyên ảnh cũ
+                            newAvatar = null,
                             onSuccess = {
                                 currentUsername = newNameInput
                                 sharedPref.edit().putString("USERNAME", newNameInput).apply()
@@ -151,22 +172,24 @@ fun ProfileScreen(
         ) {
             Spacer(modifier = Modifier.height(24.dp))
 
-            // PHẦN AVATAR CÓ NÚT CHỈNH SỬA
             Box(
                 modifier = Modifier
                     .size(120.dp)
-                    .clickable { imagePickerLauncher.launch("image/*") }, // Click vào ảnh để đổi
+                    .clickable { imagePickerLauncher.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) {
                 if (currentAvatarUrl.isNotEmpty()) {
                     AsyncImage(
-                        model = currentAvatarUrl,
+                        model = imageModel,
                         contentDescription = "Profile Picture",
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(CircleShape)
                             .border(2.dp, TealPrimary, CircleShape),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        onError = {
+                            Log.e("COIL_ERROR", "Lỗi hiển thị ảnh. Dữ liệu: ${currentAvatarUrl.take(50)}...")
+                        }
                     )
                 } else {
                     Box(
@@ -180,7 +203,6 @@ fun ProfileScreen(
                     }
                 }
 
-                // Icon cái bút để người dùng biết là sửa được
                 Surface(
                     modifier = Modifier
                         .size(32.dp)
@@ -227,18 +249,14 @@ fun ProfileScreen(
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
-
-                    with(sharedPref.edit()) {
-                        clear()
-                        apply()
-                    }
+                    sharedPref.edit().clear().apply()
                     onLogout()
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
             ) {
-                Text(" ĐĂNG XUẤT", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("ĐĂNG XUẤT", color = Color.White, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -247,53 +265,56 @@ fun ProfileScreen(
 }
 
 /**
- * Hàm hỗ trợ chuyển đổi URI ảnh sang chuỗi Base64 định dạng PNG
+ * Chuyển đổi URI ảnh sang chuỗi Base64 PNG chuẩn
  */
 fun uriToBase64Png(context: Context, uri: Uri): String? {
     return try {
         val inputStream = context.contentResolver.openInputStream(uri)
         val originalBitmap = BitmapFactory.decodeStream(inputStream)
 
-        // Bước 1: Giảm kích thước ảnh (Scale) để tiết kiệm dung lượng DB
-        val scaledBitmap = Bitmap.createScaledBitmap(
-            originalBitmap, 400, 400, true // Resize về 400x400 px
-        )
+        // Resize ảnh về 400x400 để DB Server không bị quá tải
+        val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, 400, 400, true)
 
         val outputStream = ByteArrayOutputStream()
-        // Bước 2: Nén định dạng PNG
         scaledBitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream)
         val byteArray = outputStream.toByteArray()
 
         "data:image/png;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP)
     } catch (e: Exception) {
-        Log.e("ProfileScreen", "Lỗi convert ảnh: ${e.message}")
+        Log.e("PROFILE_ERROR", "Lỗi convert ảnh: ${e.message}")
         null
     }
 }
 
-// Trong hàm updateUserProfile, hãy Log dữ liệu ra để kiểm tra
-fun updateUserProfile(context: Context, newName: String, newAvatar: String?, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+/**
+ * Gửi yêu cầu cập nhật Profile lên Server
+ */
+fun updateUserProfile(
+    context: Context,
+    newName: String,
+    newAvatar: String?,
+    onSuccess: () -> Unit,
+    onFailure: (String) -> Unit
+) {
     val authService = RetrofitClient.instance.create(AuthService::class.java)
     val sharedPref = context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE)
     val token = sharedPref.getString("TOKEN", null)
 
     val requestBody = UpdateProfileRequest(fullName = newName, avatarUrl = newAvatar)
 
-    // Log để kiểm tra xem Client có thực sự gửi chuỗi ảnh đi không
-    Log.d("API_DEBUG", "Gửi Avatar: ${newAvatar?.take(50)}...")
-
     authService.updateProfile("Bearer $token", requestBody).enqueue(object : Callback<Void> {
         override fun onResponse(call: Call<Void>, response: Response<Void>) {
             if (response.isSuccessful) {
                 onSuccess()
             } else {
-                // Nếu lỗi 413 tức là ảnh vẫn quá lớn, cần tăng limit ở Server (Bước 1)
-                Log.e("API_ERROR", "Mã lỗi: ${response.code()}")
-                onFailure("Lỗi Server: ${response.code()}")
+                val errorMsg = response.errorBody()?.string() ?: "Unknown"
+                Log.e("API_DEBUG", "Lỗi: $errorMsg")
+                onFailure("Mã lỗi: ${response.code()}")
             }
         }
+
         override fun onFailure(call: Call<Void>, t: Throwable) {
-            onFailure("Lỗi kết nối: ${t.message}")
+            onFailure(t.message ?: "Lỗi kết nối")
         }
     })
 }

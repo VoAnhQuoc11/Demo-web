@@ -210,7 +210,7 @@ fun performLogin(context: Context, user: String, pass: String, onSuccess: () -> 
                         putString("USERNAME", userData.fullName)
 
                         // 🛠️ ĐÃ SỬA: Dùng .avatarUrl thay vì .avatar
-                        putString("AVATAR", userData.avatarUrl ?: "")
+                        putString("AVATAR_URL", userData.avatarUrl ?: "")
 
 
                         apply()

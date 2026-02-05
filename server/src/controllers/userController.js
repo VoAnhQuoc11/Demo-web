@@ -18,10 +18,25 @@ exports.getUsers = async (req, res) => {
 // server/src/controllers/userController.js
 exports.updateProfile = async (req, res) => {
     try {
-        // Đảm bảo req.body chứa avatarUrl được gửi từ Android
-        const updatedUser = await ChatService.updateUserProfile(req.user.userId, req.body);
+        const { fullName, avatarUrl } = req.body;
+        
+        // Kiểm tra xem userId có tồn tại từ middleware auth không
+        if (!req.user || !req.user.userId) {
+            return res.status(401).json({ message: "Không xác định được người dùng" });
+        }
+
+        const updatedUser = await ChatService.updateUserProfile(req.user.userId, {
+            fullName,
+            avatarUrl
+        });
+
+        if (!updatedUser) {
+            return res.status(404).json({ message: "Người dùng không tồn tại" });
+        }
+
         res.json(updatedUser);
     } catch (error) {
+        console.error("Lỗi updateProfile:", error.message);
         res.status(500).json({ message: error.message });
     }
 };
