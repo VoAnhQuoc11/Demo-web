@@ -58,6 +58,21 @@ fun MessageBubble(
         senderInfo?.avatarUrl ?: ""
     }
 
+    // 🛠️ 2. THÊM LOGIC GIẢI MÃ BASE64 CHO AVATAR NGƯỜI GỬI
+    val avatarModel = remember(finalAvatarUrl) {
+        if (finalAvatarUrl.startsWith("data:image")) {
+            try {
+                // Tách bỏ tiền tố metadata và giải mã sang ByteArray
+                val base64String = finalAvatarUrl.substringAfter(",")
+                android.util.Base64.decode(base64String, android.util.Base64.DEFAULT)
+            } catch (e: Exception) {
+                finalAvatarUrl
+            }
+        } else {
+            finalAvatarUrl
+        }
+    }
+
     LaunchedEffect(isMe) {
         if (!isMe) onSeen()
     }
@@ -96,12 +111,16 @@ fun MessageBubble(
                     color = TealLight
                 ) {
                     Box(contentAlignment = Alignment.Center) {
+                        // ✅ SỬ DỤNG avatarModel ĐÃ GIẢI MÃ
                         if (finalAvatarUrl.isNotBlank() && finalAvatarUrl != DEFAULT_AVATAR_URL_BUBBLE) {
                             AsyncImage(
-                                model = finalAvatarUrl,
+                                model = avatarModel, // <--- Cập nhật ở đây
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                contentScale = ContentScale.Crop
+                                contentScale = ContentScale.Crop,
+                                onError = {
+                                    android.util.Log.e("COIL_ERROR", "Lỗi load avatar tin nhắn của: $finalSenderName")
+                                }
                             )
                         } else {
                             val firstChar = finalSenderName.trim().firstOrNull()?.uppercase() ?: "?"

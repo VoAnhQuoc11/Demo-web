@@ -1,5 +1,6 @@
 ﻿package com.example.client.view.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -178,6 +179,24 @@ fun AddNewContactScreen(
 
 @Composable
 fun SearchResultItem(user: User, onAddFriend: () -> Unit) {
+    // 1. Tối ưu hóa Model cho AsyncImage giống logic màn Profile
+    // Giải mã Base64 thành ByteArray để Coil hiển thị ổn định hơn
+    val imageModel = remember(user.avatarUrl) {
+        val avatarUrl = user.avatarUrl
+        if (!avatarUrl.isNullOrBlank() && avatarUrl.startsWith("data:image")) {
+            try {
+                // Tách bỏ phần tiền tố "data:image/...;base64,"
+                val base64String = avatarUrl.substringAfter(",")
+                android.util.Base64.decode(base64String, android.util.Base64.DEFAULT)
+            } catch (e: Exception) {
+                Log.e("SEARCH_AVATAR_DEBUG", "Giải mã Base64 thất bại: ${e.message}")
+                avatarUrl
+            }
+        } else {
+            avatarUrl // Nếu là URL bình thường (https://...)
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
@@ -189,22 +208,26 @@ fun SearchResultItem(user: User, onAddFriend: () -> Unit) {
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ĐÃ CẬP NHẬT: Hiển thị Avatar từ link Database hoặc Chữ cái đầu
+            // 2. PHẦN HIỂN THỊ AVATAR
             Surface(modifier = Modifier.size(50.dp), shape = CircleShape, color = TealLight) {
                 Box(contentAlignment = Alignment.Center) {
                     val avatarUrl = user.avatarUrl
 
+                    // Kiểm tra điều kiện hiển thị ảnh (không trống và không phải link mặc định)
                     if (!avatarUrl.isNullOrBlank() && avatarUrl != DEFAULT_AVATAR_ADD_CONTACT) {
                         AsyncImage(
-                            model = avatarUrl,
+                            model = imageModel, // Sử dụng imageModel đã giải mã ở trên
                             contentDescription = "Avatar",
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(CircleShape),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Crop,
+                            onError = {
+                                Log.e("COIL_ERROR", "Không thể load ảnh search cho: ${user.username}")
+                            }
                         )
                     } else {
-                        // Hiện chữ cái đầu nếu không có ảnh hoặc là ảnh mặc định Imgur
+                        // Hiển thị chữ cái đầu nếu không có ảnh
                         val displayName = user.fullName.ifBlank { user.username }
                         Text(
                             text = displayName.trim().take(1).uppercase(),
@@ -231,9 +254,8 @@ fun SearchResultItem(user: User, onAddFriend: () -> Unit) {
                 )
             }
 
-            // LOGIC KIỂM TRA TRẠNG THÁI BẠN BÈ
+            // LOGIC KIỂM TRA TRẠNG THÁI BẠN BÈ (Giữ nguyên)
             if (user.isFriend) {
-                // Đã là bạn bè
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = 8.dp)
@@ -243,7 +265,6 @@ fun SearchResultItem(user: User, onAddFriend: () -> Unit) {
                     Text("Đã kết bạn", fontSize = 13.sp, color = Color.Gray)
                 }
             } else {
-                // Chưa là bạn bè
                 Button(
                     onClick = onAddFriend,
                     colors = ButtonDefaults.buttonColors(containerColor = TealPrimary),

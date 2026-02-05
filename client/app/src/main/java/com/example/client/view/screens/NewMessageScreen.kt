@@ -239,6 +239,22 @@ fun NewMessageContactRow(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    // 🛠️ THÊM LOGIC GIẢI MÃ BASE64 TƯƠNG TỰ MÀN PROFILE
+    val avatarUrl = contact.avatarUrl
+    val imageModel = remember(avatarUrl) {
+        if (!avatarUrl.isNullOrBlank() && avatarUrl.startsWith("data:image")) {
+            try {
+                // Tách bỏ tiền tố và giải mã sang ByteArray
+                val base64String = avatarUrl.substringAfter(",")
+                android.util.Base64.decode(base64String, android.util.Base64.DEFAULT)
+            } catch (e: Exception) {
+                avatarUrl
+            }
+        } else {
+            avatarUrl
+        }
+    }
+
     Surface(
         onClick = onClick,
         modifier = Modifier
@@ -251,23 +267,24 @@ fun NewMessageContactRow(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Hiển thị avatar từ database hoặc chữ cái đầu
             Surface(
                 modifier = Modifier.size(48.dp),
                 shape = CircleShape,
                 color = TealLight
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    val avatarUrl = contact.avatarUrl
-
+                    // ✅ SỬ DỤNG imageModel ĐÃ GIẢI MÃ
                     if (!avatarUrl.isNullOrBlank() && avatarUrl != DEFAULT_AVATAR_NEW_MESSAGE) {
                         AsyncImage(
-                            model = avatarUrl,
+                            model = imageModel, // <--- Cập nhật ở đây
                             contentDescription = "Avatar",
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(CircleShape),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Crop,
+                            onError = {
+                                android.util.Log.e("COIL_ERROR", "Lỗi load ảnh tại NewMessage cho: ${contact.username}")
+                            }
                         )
                     } else {
                         val displayName = contact.fullName.ifBlank { contact.username }

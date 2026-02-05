@@ -1,6 +1,8 @@
 ﻿package com.example.client.view.screens
 
 import android.net.Uri
+import android.util.Log
+import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -158,10 +160,25 @@ private fun ChatTopBar(
     partner: User?,
     onBack: () -> Unit
 ) {
+    // 🛠️ THÊM LOGIC GIẢI MÃ AVATAR GIỐNG PROFILE SCREEN
+    val avatarUrl = partner?.avatarUrl
+    val imageModel = remember(avatarUrl) {
+        if (!avatarUrl.isNullOrBlank() && avatarUrl.startsWith("data:image")) {
+            try {
+                val base64String = avatarUrl.substringAfter(",")
+                Base64.decode(base64String, Base64.DEFAULT)
+            } catch (e: Exception) {
+                Log.e("CHAT_AVATAR_DEBUG", "Lỗi giải mã Base64: ${e.message}")
+                avatarUrl
+            }
+        } else {
+            avatarUrl
+        }
+    }
+
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // AVATAR HOẶC CHỮ CÁI ĐẦU CẠNH NÚT BACK
                 Surface(
                     modifier = Modifier.size(36.dp),
                     shape = CircleShape,
@@ -169,13 +186,15 @@ private fun ChatTopBar(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         if (!isGroup) {
-                            val avatarUrl = partner?.avatarUrl
                             if (!avatarUrl.isNullOrBlank() && avatarUrl != DEFAULT_AVATAR_URL_CHAT) {
                                 AsyncImage(
-                                    model = avatarUrl,
+                                    model = imageModel, // ✅ Sử dụng imageModel đã giải mã
                                     contentDescription = "Avatar",
                                     modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Crop,
+                                    onError = {
+                                        Log.e("COIL_ERROR", "Không thể load avatar tại ChatTopBar")
+                                    }
                                 )
                             } else {
                                 // Hiển thị chữ cái đầu tên (Ví dụ: H cho Hau)

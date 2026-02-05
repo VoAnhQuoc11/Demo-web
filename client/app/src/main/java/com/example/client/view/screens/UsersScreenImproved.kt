@@ -267,6 +267,22 @@ private fun ChatItemAvatar(
     partner: User?,
     displayName: String
 ) {
+    // --- THÊM LOGIC NÀY VÀO ĐẦU HÀM ---
+    val avatarUrl = partner?.avatarUrl
+    val imageModel = remember(avatarUrl) {
+        if (!avatarUrl.isNullOrBlank() && avatarUrl.startsWith("data:image")) {
+            try {
+                val base64String = avatarUrl.substringAfter(",")
+                android.util.Base64.decode(base64String, android.util.Base64.DEFAULT)
+            } catch (e: Exception) {
+                avatarUrl
+            }
+        } else {
+            avatarUrl
+        }
+    }
+    // ----------------------------------
+
     Box {
         Surface(
             modifier = Modifier.size(56.dp),
@@ -275,15 +291,11 @@ private fun ChatItemAvatar(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 if (!room.isGroup) {
-                    val avatarUrl = partner?.avatarUrl
-                    // Kiểm tra: Nếu có ảnh VÀ ảnh đó không phải ảnh mặc định
                     if (!avatarUrl.isNullOrBlank() && avatarUrl != DEFAULT_AVATAR_URL) {
                         AsyncImage(
-                            model = avatarUrl,
+                            model = imageModel, // <--- SỬA THÀNH imageModel
                             contentDescription = "Avatar",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape),
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
                             contentScale = ContentScale.Crop
                         )
                     } else {

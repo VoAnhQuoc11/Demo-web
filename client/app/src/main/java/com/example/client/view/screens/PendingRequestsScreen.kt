@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -77,6 +78,23 @@ fun PendingRequestsScreen(
 
 @Composable
 fun PendingRequestItem(user: User, onAccept: () -> Unit) {
+    // 1. Thêm logic giải mã ảnh Base64 giống logic màn Profile
+    val avatarUrl = user.avatarUrl
+    val imageModel = remember(avatarUrl) {
+        if (!avatarUrl.isNullOrBlank() && avatarUrl.startsWith("data:image")) {
+            try {
+                // Tách bỏ tiền tố "data:image/...;base64,"
+                val base64String = avatarUrl.substringAfter(",")
+                android.util.Base64.decode(base64String, android.util.Base64.DEFAULT)
+            } catch (e: Exception) {
+                android.util.Log.e("PENDING_AVATAR", "Lỗi giải mã: ${e.message}")
+                avatarUrl
+            }
+        } else {
+            avatarUrl
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         shape = RoundedCornerShape(12.dp),
@@ -87,18 +105,37 @@ fun PendingRequestItem(user: User, onAccept: () -> Unit) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 2. Cập nhật phần hiển thị Avatar
             Surface(Modifier.size(48.dp), shape = CircleShape, color = TealLight) {
                 Box(contentAlignment = Alignment.Center) {
-                    val initial = if (user.username.isNotEmpty()) user.username.take(1).uppercase() else "?"
-                    Text(initial, fontWeight = FontWeight.Bold, color = TealPrimary)
+                    // Kiểm tra nếu có avatarUrl thì dùng AsyncImage, ngược lại dùng chữ cái đầu
+                    if (!avatarUrl.isNullOrBlank()) {
+                        coil.compose.AsyncImage(
+                            model = imageModel,
+                            contentDescription = "Avatar",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            onError = {
+                                android.util.Log.e("COIL_ERROR", "Không thể load ảnh lời mời kết bạn")
+                            }
+                        )
+                    } else {
+                        val initial = if (user.username.isNotEmpty()) user.username.take(1).uppercase() else "?"
+                        Text(initial, fontWeight = FontWeight.Bold, color = TealPrimary)
+                    }
                 }
             }
+
             Spacer(Modifier.width(12.dp))
+
             Column(Modifier.weight(1f)) {
                 val displayName = if (user.fullName.isNotBlank()) user.fullName else user.username
                 Text(displayName, fontWeight = FontWeight.Bold)
                 Text(user.phoneNumber, fontSize = 12.sp, color = Color.Gray)
             }
+
             Button(
                 onClick = onAccept,
                 colors = ButtonDefaults.buttonColors(containerColor = TealPrimary),

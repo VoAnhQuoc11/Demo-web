@@ -38,6 +38,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit
 ) {
+
     // 1. Khai báo biến trạng thái (State)
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
