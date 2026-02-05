@@ -91,7 +91,7 @@ fun performLogin(context: Context, user: String, pass: String, onSuccess: () -> 
                 if (loginData?.token != null && userData != null) {
                     val sharedPref = context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE)
                     with(sharedPref.edit()) {
-                        putString("JWT_TOKEN", loginData.token) // <--- ĐẢM BẢO KEY Ở ĐÂY LÀ "JWT_TOKEN"
+                        putString("TOKEN", loginData.token) // <--- ĐẢM BẢO KEY Ở ĐÂY LÀ "JWT_TOKEN"
                         putString("USER_ID", userData.id)
                         putString("USERNAME", userData.fullName)
                         apply()

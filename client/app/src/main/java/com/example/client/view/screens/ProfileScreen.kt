@@ -177,7 +177,7 @@ fun ProfileScreen(
 // Hàm gọi API để cập nhật tên người dùng
 fun updateUserName(context: Context, newName: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
     val authService = RetrofitClient.instance.create(AuthService::class.java)
-    val token = context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE).getString("JWT_TOKEN", null)
+    val token = context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE).getString("TOKEN", null)
 
     if (token == null) {
         onFailure("Bạn chưa đăng nhập.")
