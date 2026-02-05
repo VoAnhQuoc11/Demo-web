@@ -2,6 +2,7 @@ package com.example.client.model
 
 import com.example.client.model.data.ChatRoom
 import com.example.client.model.data.User
+import com.example.client.models.UpdateProfileRequest
 import retrofit2.http.*
 import retrofit2.Response
 
@@ -44,6 +45,12 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Body request: FriendRequest
     ): GenericResponse
+    // Trong interface ApiService (hoặc AuthService tùy bạn đang dùng cái nào để update)
+    @PUT("api/users/update") // Đường dẫn phải khớp với userRoutes.js của server
+    suspend fun updateProfile(
+        @Header("Authorization") token: String,
+        @Body request: UpdateProfileRequest
+    ): Response<Void> // Hoặc trả về UserProfile object
 
 
     @POST("api/users/friends/accept")

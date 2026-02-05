@@ -48,18 +48,21 @@ class BaseRepository {
         }
     }
 
-    async update(id, data) {
-        try {
-            return await this.model.findByIdAndUpdate(
-                id,
-                data,
-                { new: true, runValidators: true }
-            );
-        } catch (error) {
-            throw new Error(`Update failed: ${error.message}`);
-        }
+// server/src/repositories/BaseRepository.js
+async update(id, data) {
+    try {
+        return await this.model.findByIdAndUpdate(
+            id,
+            { $set: data }, // Sử dụng $set để đảm bảo cập nhật chính xác và an toàn
+            { 
+                new: true, 
+                runValidators: true 
+            }
+        );
+    } catch (error) {
+        throw new Error(`Update failed: ${error.message}`);
     }
-
+}
     async delete(id) {
         try {
             return await this.model.findByIdAndDelete(id);

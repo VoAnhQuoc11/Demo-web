@@ -14,8 +14,11 @@ exports.getUsers = async (req, res) => {
 };
 
 // 2. Cập nhật Profile
+// server/src/controllers/userController.js
+// server/src/controllers/userController.js
 exports.updateProfile = async (req, res) => {
     try {
+        // Đảm bảo req.body chứa avatarUrl được gửi từ Android
         const updatedUser = await ChatService.updateUserProfile(req.user.userId, req.body);
         res.json(updatedUser);
     } catch (error) {

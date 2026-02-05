@@ -1,8 +1,11 @@
 package com.example.client.utils // Nhớ đổi tên package cho đúng với project của bạn
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Base64
+import java.io.ByteArrayOutputStream
 
 /**
  * Hàm chuyển đổi chuỗi Base64 thành Bitmap để hiển thị lên ảnh
