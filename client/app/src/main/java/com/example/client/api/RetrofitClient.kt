@@ -16,12 +16,13 @@ object RetrofitClient {
         .writeTimeout(60, TimeUnit.SECONDS)   // Chờ gửi dữ liệu 60s
         .build()
 
-    val instance: AuthService by lazy {
+    val instance: Retrofit by lazy { // <-- Đảm bảo kiểu là 'Retrofit'
         Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(okHttpClient) // 👈 2. Gắn bộ đếm giờ vào đây
+            .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-            .create(AuthService::class.java)
+        // KHÔNG CÓ DÒNG NÀY: .create(AuthService::class.java)
+        // Nếu có, hãy xóa hoặc comment nó đi!
     }
 }

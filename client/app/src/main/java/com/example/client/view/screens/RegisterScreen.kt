@@ -107,8 +107,13 @@ fun RegisterScreen(
 }
 
 // Logic gọi API Register
+// Logic gọi API Register
 fun performRegister(context: Context, user: String, pass: String, name: String, phone: String, onSuccess: () -> Unit, onError: () -> Unit) {
-    val authService = RetrofitClient.instance
+    // DÒNG NÀY CẦN ĐƯỢC SỬA!
+    // Trước đây có thể là: val authService = RetrofitClient.instance
+    // Bây giờ phải thêm .create(AuthService::class.java)
+    val authService = RetrofitClient.instance.create(AuthService::class.java) // <-- SỬA Ở ĐÂY
+
     val request = RegisterRequest(user, pass, name, phone)
 
     authService.register(request).enqueue(object : Callback<LoginResponse> {
