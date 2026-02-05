@@ -46,10 +46,6 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val sharedPref = remember { context.getSharedPreferences("ChatAppPrefs", Context.MODE_PRIVATE) }
-    LaunchedEffect(Unit) {
-        val savedAvatar = sharedPref.getString("AVATAR_URL", "")
-        Log.d("PROFILE_DEBUG", "Avatar hiện tại trong máy: ${savedAvatar?.take(20)}...")
-    }
 
     // State đồng bộ từ SharedPreferences
     var currentUsername by remember {
@@ -63,11 +59,16 @@ fun ProfileScreen(
     var showEditNameDialog by remember { mutableStateOf(false) }
     var newNameInput by remember { mutableStateOf(currentUsername) }
 
-    // Tối ưu hóa Model cho AsyncImage: Chuyển Base64 thành ByteArray để Coil không bị lỗi parser
+    // Kiểm tra xem URL có phải là ảnh hợp lệ để hiển thị không
+    // Loại trừ trường hợp rỗng hoặc link mặc định của Imgur
+    val isAvatarValid = remember(currentAvatarUrl) {
+        currentAvatarUrl.isNotEmpty() && currentAvatarUrl != "https://i.imgur.com/6VBx3io.png"
+    }
+
+    // Tối ưu hóa Model cho AsyncImage
     val imageModel = remember(currentAvatarUrl) {
         if (currentAvatarUrl.startsWith("data:image")) {
             try {
-                // Tách bỏ phần "data:image/png;base64," lấy phần mã hóa phía sau
                 val base64String = currentAvatarUrl.substringAfter(",")
                 Base64.decode(base64String, Base64.DEFAULT)
             } catch (e: Exception) {
@@ -75,7 +76,7 @@ fun ProfileScreen(
                 currentAvatarUrl
             }
         } else {
-            currentAvatarUrl // Nếu là đường dẫn URL bình thường
+            currentAvatarUrl
         }
     }
 
@@ -86,7 +87,6 @@ fun ProfileScreen(
             val base64Image = uriToBase64Png(context, it)
             if (base64Image != null) {
                 val oldAvatar = currentAvatarUrl
-                // Cập nhật UI ngay lập tức
                 currentAvatarUrl = base64Image
 
                 updateUserProfile(
@@ -98,7 +98,7 @@ fun ProfileScreen(
                         Toast.makeText(context, "Cập nhật ảnh thành công!", Toast.LENGTH_SHORT).show()
                     },
                     onFailure = { err ->
-                        currentAvatarUrl = oldAvatar // Hoàn tác nếu lỗi
+                        currentAvatarUrl = oldAvatar
                         Toast.makeText(context, "Lỗi Server: $err", Toast.LENGTH_LONG).show()
                     }
                 )
@@ -178,7 +178,8 @@ fun ProfileScreen(
                     .clickable { imagePickerLauncher.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) {
-                if (currentAvatarUrl.isNotEmpty()) {
+                // Logic hiển thị: Nếu avatar hợp lệ thì hiện ảnh, ngược lại hiện chữ cái đầu
+                if (isAvatarValid) {
                     AsyncImage(
                         model = imageModel,
                         contentDescription = "Profile Picture",
@@ -188,7 +189,7 @@ fun ProfileScreen(
                             .border(2.dp, TealPrimary, CircleShape),
                         contentScale = ContentScale.Crop,
                         onError = {
-                            Log.e("COIL_ERROR", "Lỗi hiển thị ảnh. Dữ liệu: ${currentAvatarUrl.take(50)}...")
+                            Log.e("COIL_ERROR", "Lỗi hiển thị ảnh.")
                         }
                     )
                 } else {
@@ -196,10 +197,16 @@ fun ProfileScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(CircleShape)
-                            .background(Color.LightGray),
+                            .background(Color.LightGray)
+                            .border(2.dp, TealPrimary, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = currentUsername.take(1).uppercase(), fontSize = 40.sp, color = Color.White)
+                        Text(
+                            text = currentUsername.take(1).uppercase(),
+                            fontSize = 40.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 
@@ -264,21 +271,14 @@ fun ProfileScreen(
     }
 }
 
-/**
- * Chuyển đổi URI ảnh sang chuỗi Base64 PNG chuẩn
- */
 fun uriToBase64Png(context: Context, uri: Uri): String? {
     return try {
         val inputStream = context.contentResolver.openInputStream(uri)
         val originalBitmap = BitmapFactory.decodeStream(inputStream)
-
-        // Resize ảnh về 400x400 để DB Server không bị quá tải
         val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, 400, 400, true)
-
         val outputStream = ByteArrayOutputStream()
         scaledBitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream)
         val byteArray = outputStream.toByteArray()
-
         "data:image/png;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP)
     } catch (e: Exception) {
         Log.e("PROFILE_ERROR", "Lỗi convert ảnh: ${e.message}")
@@ -286,9 +286,6 @@ fun uriToBase64Png(context: Context, uri: Uri): String? {
     }
 }
 
-/**
- * Gửi yêu cầu cập nhật Profile lên Server
- */
 fun updateUserProfile(
     context: Context,
     newName: String,
@@ -307,8 +304,6 @@ fun updateUserProfile(
             if (response.isSuccessful) {
                 onSuccess()
             } else {
-                val errorMsg = response.errorBody()?.string() ?: "Unknown"
-                Log.e("API_DEBUG", "Lỗi: $errorMsg")
                 onFailure("Mã lỗi: ${response.code()}")
             }
         }

@@ -1,6 +1,9 @@
 package com.example.client.view.screens
 
+import android.util.Base64
+import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,25 +17,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.client.model.data.User
 import com.example.client.view.theme.TealLight
 import com.example.client.view.theme.TealPrimary
-import com.example.client.viewmodel.ContactViewModel // Import ContactViewModel
+import com.example.client.viewmodel.ContactViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PendingRequestsScreen(
-    contactViewModel: ContactViewModel, // Sử dụng ContactViewModel thay vì ChatViewModel
-    onFriendAccepted: () -> Unit,       // Callback để báo cho AppNavigation biết cần refresh list chat
+    contactViewModel: ContactViewModel,
+    onFriendAccepted: () -> Unit,
     onBack: () -> Unit
 ) {
-    // Lấy dữ liệu từ ContactViewModel
     val pendingRequests by contactViewModel.pendingRequests.collectAsState()
 
-    // Tự động load lại danh sách khi mở màn hình
     LaunchedEffect(Unit) {
         contactViewModel.fetchPendingRequests()
     }
@@ -63,9 +66,7 @@ fun PendingRequestsScreen(
                     PendingRequestItem(
                         user = user,
                         onAccept = {
-                            // Gọi hàm accept từ ContactViewModel
                             contactViewModel.acceptFriendRequest(user.id) {
-                                // Khi API thành công -> Gọi callback này để AppNavigation refresh ChatViewModel
                                 onFriendAccepted()
                             }
                         }
@@ -78,16 +79,22 @@ fun PendingRequestsScreen(
 
 @Composable
 fun PendingRequestItem(user: User, onAccept: () -> Unit) {
-    // 1. Thêm logic giải mã ảnh Base64 giống logic màn Profile
     val avatarUrl = user.avatarUrl
+
+    // 1. Kiểm tra URL avatar có hợp lệ để hiển thị ảnh không
+    // Loại bỏ trường hợp rỗng hoặc link mặc định của Imgur
+    val isAvatarValid = remember(avatarUrl) {
+        !avatarUrl.isNullOrBlank() && avatarUrl != "https://i.imgur.com/6VBx3io.png"
+    }
+
+    // 2. Logic giải mã ảnh Base64 tương tự màn Profile
     val imageModel = remember(avatarUrl) {
         if (!avatarUrl.isNullOrBlank() && avatarUrl.startsWith("data:image")) {
             try {
-                // Tách bỏ tiền tố "data:image/...;base64,"
                 val base64String = avatarUrl.substringAfter(",")
-                android.util.Base64.decode(base64String, android.util.Base64.DEFAULT)
+                Base64.decode(base64String, Base64.DEFAULT)
             } catch (e: Exception) {
-                android.util.Log.e("PENDING_AVATAR", "Lỗi giải mã: ${e.message}")
+                Log.e("PENDING_AVATAR", "Giải mã Base64 thất bại: ${e.message}")
                 avatarUrl
             }
         } else {
@@ -105,26 +112,38 @@ fun PendingRequestItem(user: User, onAccept: () -> Unit) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 2. Cập nhật phần hiển thị Avatar
-            Surface(Modifier.size(48.dp), shape = CircleShape, color = TealLight) {
-                Box(contentAlignment = Alignment.Center) {
-                    // Kiểm tra nếu có avatarUrl thì dùng AsyncImage, ngược lại dùng chữ cái đầu
-                    if (!avatarUrl.isNullOrBlank()) {
-                        coil.compose.AsyncImage(
-                            model = imageModel,
-                            contentDescription = "Avatar",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                            onError = {
-                                android.util.Log.e("COIL_ERROR", "Không thể load ảnh lời mời kết bạn")
-                            }
-                        )
-                    } else {
-                        val initial = if (user.username.isNotEmpty()) user.username.take(1).uppercase() else "?"
-                        Text(initial, fontWeight = FontWeight.Bold, color = TealPrimary)
-                    }
+            // 3. Phần hiển thị Avatar đã cập nhật logic
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(TealLight),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isAvatarValid) {
+                    AsyncImage(
+                        model = imageModel,
+                        contentDescription = "Avatar",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .border(1.dp, TealPrimary, CircleShape), // Thêm viền nhẹ cho đẹp
+                        contentScale = ContentScale.Crop,
+                        onError = {
+                            Log.e("COIL_ERROR", "Không thể load ảnh: $avatarUrl")
+                        }
+                    )
+                } else {
+                    // Hiển thị chữ cái đầu tiên của tên khi không có ảnh hoặc link mặc định
+                    val displayName = if (user.fullName.isNotBlank()) user.fullName else user.username
+                    val initial = if (displayName.isNotEmpty()) displayName.take(1).uppercase() else "?"
+
+                    Text(
+                        text = initial,
+                        fontWeight = FontWeight.Bold,
+                        color = TealPrimary,
+                        fontSize = 18.sp
+                    )
                 }
             }
 
@@ -139,7 +158,8 @@ fun PendingRequestItem(user: User, onAccept: () -> Unit) {
             Button(
                 onClick = onAccept,
                 colors = ButtonDefaults.buttonColors(containerColor = TealPrimary),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp)
             ) {
                 Text("Đồng ý", fontSize = 12.sp)
             }
