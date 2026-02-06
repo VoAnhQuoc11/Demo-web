@@ -5,7 +5,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
     // Dùng 10.0.2.2 nếu dùng giả lập Android Studio, hoặc IP máy tính nếu dùng máy thật
-    private const val BASE_URL = "http://10.0.2.2:3000/"
+    private const val BASE_URL = "http://192.168.1.13:3000/"
 
     val instance: ApiService by lazy {
         val retrofit = Retrofit.Builder()

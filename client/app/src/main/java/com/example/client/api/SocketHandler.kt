@@ -8,7 +8,7 @@ import java.net.URISyntaxException
 object SocketHandler {
     lateinit var mSocket: Socket
 
-    private const val SOCKET_URL = "http://10.0.2.2:3000/"
+    private const val SOCKET_URL = "http://192.168.1.13:3000/"
 
     @Synchronized
     fun setSocket(token: String) {

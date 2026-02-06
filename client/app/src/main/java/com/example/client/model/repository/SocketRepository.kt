@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 class SocketRepository(
     // Lưu ý: Dùng 10.0.2.2 cho Emulator, hoặc IP LAN (ví dụ 192.168.1.x) cho máy thật
-    private val socketUrl: String = "http://10.0.2.2:3000"
+    private val socketUrl: String = "http://192.168.1.13:3000/"
 ) {
 
     private val TAG = "SocketRepo"
