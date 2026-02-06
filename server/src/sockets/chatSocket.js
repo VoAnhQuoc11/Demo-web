@@ -202,6 +202,8 @@ module.exports = (io, socket) => {
                 roomId: populatedMessage.roomId,
                 senderId: populatedMessage.senderId._id,
                 content: populatedMessage.content,
+                senderName: populatedMessage.senderId.fullName || populatedMessage.senderId.username,
+                senderAvatar: populatedMessage.senderId.avatarUrl || "",
                 type: populatedMessage.type,
                 timestamp: populatedMessage.createdAt.getTime(),
                 createdAt: populatedMessage.createdAt.toISOString()
@@ -225,6 +227,8 @@ module.exports = (io, socket) => {
                 roomId: msg.roomId,
                 senderId: msg.senderId._id,
                 content: msg.content,
+                senderName: msg.senderId.fullName || msg.senderId.username,
+                senderAvatar: msg.senderId.avatarUrl || "",
                 type: msg.type,
                 timestamp: msg.createdAt.getTime(),
                 createdAt: msg.createdAt.toISOString()

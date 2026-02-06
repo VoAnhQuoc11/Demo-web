@@ -22,6 +22,8 @@ data class Message(
                 senderId = json.optString("senderId"),
                 content = json.optString("content"),
                 type = json.optString("type", "TEXT"),
+                senderName = json.optString("senderName", ""),
+                senderAvatar = json.optString("senderAvatar", ""),
 
                 // Lấy createdAt từ server, nếu không có thì để rỗng
                 createdAt = json.optString("createdAt", ""),

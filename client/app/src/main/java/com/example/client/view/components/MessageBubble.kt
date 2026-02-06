@@ -38,26 +38,36 @@ fun MessageBubble(
     viewModel: ChatViewModel,
     onSeen: () -> Unit = {}
 ) {
+    // 1. Bạn có thể giữ dòng này để dùng khi tin nhắn không kèm thông tin (dự phòng)
     val friends by viewModel.friends.collectAsState()
 
     val isMe = remember(message.senderId, currentUserId) {
         message.senderId == currentUserId
     }
 
-    val senderInfo = remember(message.senderId, friends) {
-        friends.find { it.id == message.senderId }
+    // 2. LOGIC HIỂN THỊ TÊN: Ưu tiên dữ liệu đính kèm tin nhắn từ bất kỳ ai
+    val finalSenderName = remember(message.senderName, message.senderId, friends) {
+        when {
+            // Nếu tin nhắn có kèm tên (do server gửi), dùng luôn tên đó
+            message.senderName.isNotBlank() -> message.senderName
+
+            // Nếu không có, mới tìm trong danh sách bạn bè (dự phòng cho tin nhắn cũ)
+            else -> {
+                val friend = friends.find { it.id == message.senderId }
+                friend?.let { it.fullName.ifBlank { it.username } } ?: "Người dùng"
+            }
+        }
     }
 
-    val finalSenderName = message.senderName.ifBlank {
-        senderInfo?.let { it.fullName.ifBlank { it.username } } ?: "Người dùng"
+    // 3. LOGIC HIỂN THỊ AVATAR
+    val finalAvatarUrl = remember(message.senderAvatar, message.senderId, friends) {
+        if (message.senderAvatar.isNotBlank()) {
+            message.senderAvatar
+        } else {
+            // Dự phòng tìm avatar trong danh sách bạn bè
+            friends.find { it.id == message.senderId }?.avatarUrl ?: ""
+        }
     }
-
-    val finalAvatarUrl = if (message.senderAvatar.isNotBlank()) {
-        message.senderAvatar
-    } else {
-        senderInfo?.avatarUrl ?: ""
-    }
-
     // 🛠️ 2. THÊM LOGIC GIẢI MÃ BASE64 CHO AVATAR NGƯỜI GỬI
     val avatarModel = remember(finalAvatarUrl) {
         if (finalAvatarUrl.startsWith("data:image")) {
